@@ -52,6 +52,15 @@ public abstract class ArchiveTransformer {
      * @throws IOException if some I/O error occurs
      */
     public boolean transform(final File inJarFile, final File outJarFile) throws IOException {
+        if (inJarFile.isDirectory()) {
+            DebugUtils.debug("Archive '" + inJarFile + "' is directory");
+            return false;
+        }
+        if (!inJarFile.getName().endsWith(".jar") && !inJarFile.getName().endsWith(".zip") && !inJarFile.getName().endsWith(".war")) {
+            DebugUtils.debug("Archive type '" + inJarFile + "' not supported");
+            return false;
+        }
+        DebugUtils.debug("Transforming archive '" + inJarFile + "'");
         boolean transformed = false;
         final File dir = outJarFile.getParentFile();
         if (!dir.exists()) {

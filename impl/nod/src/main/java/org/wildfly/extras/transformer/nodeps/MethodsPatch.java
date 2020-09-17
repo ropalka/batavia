@@ -64,10 +64,15 @@ final class MethodsPatch {
         final byte[][] mappingTo = generateMappingTo(methodRefRedirects, MethodRedirection.MAPPING);
         MethodInfoRefs methodInfo;
         CodeAttributeRefs codeAttribute;
+        DebugUtils.debug("Processing class: " + cfRefs.getThisClassAsString());
         for (int i = 0; i < cfRefs.getMethodsCount(); i++) {
             methodInfo = cfRefs.getMethod(i);
             codeAttribute = methodInfo.getCodeAttribute();
             if (codeAttribute == null) continue;
+            int nameIndex = methodInfo.getNameIndex();
+            int descriptorIndex = methodInfo.getDescriptorIndex();
+            DebugUtils.debug("Processing method: " + cfRefs.getConstantPool().getUtf8AsString(nameIndex) + " " + cfRefs.getConstantPool().getUtf8AsString(descriptorIndex));
+            OpcodeUtils.printMethodOpcodes(clazz, methodInfo);
             patch = getMethodPatch(clazz, codeAttribute, i,  mappingFrom, mappingTo);
             if (patch != null) {
                 if (methodPatches == null) {
@@ -284,6 +289,7 @@ final class MethodsPatch {
         int patchIndex = 4;
         int opcode;
 
+        OpcodeUtils.printMethodByteCode(clazz, offset, limit - offset);
         for (int i = offset; i <= limit - MINIMUM; i += OpcodeUtils.instructionBytesCount(clazz, i, offset)) {
             opcode = OpcodeUtils.MASK_FF & clazz[i];
             if (opcode != INVOKESTATIC && opcode != INVOKEVIRTUAL && opcode != LDC) continue; // TODO: every mapping should define interested in OPs
