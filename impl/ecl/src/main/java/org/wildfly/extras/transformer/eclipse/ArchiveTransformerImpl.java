@@ -15,115 +15,78 @@
  */
 package org.wildfly.extras.transformer.eclipse;
 
-import static org.eclipse.transformer.Transformer.AppOption.RULES_DIRECT;
-import static org.eclipse.transformer.Transformer.AppOption.RULES_MASTER_TEXT;
-import static org.eclipse.transformer.Transformer.AppOption.RULES_PER_CLASS_CONSTANT;
-import static org.eclipse.transformer.Transformer.AppOption.RULES_RENAMES;
+import static org.slf4j.helpers.NOPLogger.NOP_LOGGER;
 
+import org.eclipse.transformer.TransformOptions;
 import org.eclipse.transformer.action.Changes;
+import org.eclipse.transformer.action.ContainerChanges;
 import org.eclipse.transformer.Transformer;
 import org.wildfly.extras.transformer.ArchiveTransformer;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * @author <a href="mailto:ropalka@redhat.com">Richard Opálka</a>
  */
 final class ArchiveTransformerImpl extends ArchiveTransformer {
 
-    public static final String DEFAULT_RENAMES_REFERENCE = "jakarta-renames.properties";
-    public static final String DEFAULT_MASTER_TXT_REFERENCE = "jakarta-txt-master.properties";
-    public static final String DEFAULT_PER_CLASS_REFERENCE = "jakarta-per-class.properties";
-    public static final String DEFAULT_DIRECT_REFERENCE = "jakarta-direct.properties";
+    private static final Logger LOG = Logger.getLogger(ArchiveTransformerImpl.class.getName());
 
     ArchiveTransformerImpl(final File configsDir, final boolean verbose, final boolean invert) {
         super(configsDir, verbose, invert);
-    }
-
-    private Map<Transformer.AppOption, String> getOptionDefaults() {
-        final HashMap<Transformer.AppOption, String> optionDefaults = new HashMap<>();
-        optionDefaults.put(RULES_RENAMES, DEFAULT_RENAMES_REFERENCE);
-        optionDefaults.put(RULES_MASTER_TEXT, DEFAULT_MASTER_TXT_REFERENCE);
-        optionDefaults.put(RULES_PER_CLASS_CONSTANT, DEFAULT_PER_CLASS_REFERENCE);
-        optionDefaults.put(RULES_DIRECT, DEFAULT_DIRECT_REFERENCE);
-        return optionDefaults;
     }
 
     @Override
     public boolean transform(final File inJarFile, final File outJarFile) {
         boolean transformed;
         try {
-            if (!verbose) {
-                // Disable all logging that is very verbose.
-                System.setProperty("org.slf4j.simpleLogger.log.Transformer", "error");
-            }
-            List<String> args = new ArrayList<>();
-            if (configsDir != null) {
-                File configFile = new File(configsDir, DEFAULT_RENAMES_REFERENCE);
-                if (configFile.exists() && configFile.isFile()) {
-                    args.add("-tr");
-                    args.add(configFile.getAbsolutePath());
-                }
-                configFile = new File(configsDir, DEFAULT_MASTER_TXT_REFERENCE);
-                if (configFile.exists() && configFile.isFile()) {
-                    args.add("-tf");
-                    args.add(configFile.getAbsolutePath());
-                }
-                configFile = new File(configsDir, DEFAULT_PER_CLASS_REFERENCE);
-                if (configFile.exists() && configFile.isFile()) {
-                    args.add("-tp");
-                    args.add(configFile.getAbsolutePath());
-                }
-                configFile = new File(configsDir, DEFAULT_DIRECT_REFERENCE);
-                if (configFile.exists() && configFile.isFile()) {
-                    args.add("-td");
-                    args.add(configFile.getAbsolutePath());
-                }
-            }
-            args.add(inJarFile.getAbsolutePath());
-            args.add(outJarFile.getAbsolutePath());
-            if (verbose) {
-                args.add("-v");
-            } else {
-                args.add("--quiet");
-            }
-            if(invert) {
-                args.add("-i");
-            }
-            String[] array = new String[args.size()];
-            transformed = transform(args.toArray(array), true);
+            LOG.log(Level.FINE, "Transforming input [{0}] to output [{1}] (isDirectory: {2}, verbose: {3}, invert: {4})",
+                    new Object[]{inJarFile.getAbsolutePath(), outJarFile.getAbsolutePath(), inJarFile.isDirectory(), verbose, invert});
+            TransformOptions transformOptions = new BataviaTransformOptions(configsDir, verbose, invert, inJarFile, outJarFile);
+            transformed = transform(transformOptions, !verbose);
+            LOG.log(Level.FINE, "Transformation result for [{0}]: transformed={1}", new Object[]{inJarFile.getName(), transformed});
         } catch (Exception ex) {
+            LOG.log(Level.FINE, "Transformation failed for input [" + inJarFile.getAbsolutePath() + "]", ex);
             throw new RuntimeException(ex);
         }
         return transformed;
     }
 
-    private boolean transform(String[] args, boolean silent) throws IOException {
-        java.io.ByteArrayOutputStream devNull = new java.io.ByteArrayOutputStream();
+    private boolean transform(TransformOptions transformOptions, boolean silent) throws IOException {
         Transformer jTrans;
         if (silent) {
-            jTrans = new Transformer(new java.io.PrintStream(devNull), new java.io.PrintStream(devNull));
+            jTrans = new Transformer(NOP_LOGGER, transformOptions);
         } else {
-            jTrans = new Transformer(System.out, System.err);
+            jTrans = new Transformer(transformOptions);
         }
-        jTrans.setOptionDefaults(ArchiveTransformerImpl.class, getOptionDefaults());
-        jTrans.setArgs(args);
 
-        @SuppressWarnings("unused")
-        int rc = jTrans.run();
-        if (rc != 0) {
+        Transformer.ResultCode rc = jTrans.run();
+        LOG.log(Level.FINE, "Eclipse Transformer result code: {0}", rc);
+        if (rc != Transformer.ResultCode.SUCCESS_RC) {
             throw new IOException("Error occurred during transformation. Error code " + rc);
         }
-        // New API needed in eclipse transformer.
         Changes changes = jTrans.getLastActiveChanges();
         if (changes != null) {
-            return changes.hasChanges();
+            LOG.log(Level.FINE, "Changes: input=[{0}] output=[{1}] changed={2} renamed={3} contentChanged={4} elapsed={5}ms",
+                    new Object[]{changes.getInputResourceName(), changes.getOutputResourceName(),
+                    changes.isChanged(), changes.isRenamed(), changes.isContentChanged(), changes.getElapsedMillis()});
+            if (changes instanceof ContainerChanges) {
+                ContainerChanges cc = (ContainerChanges) changes;
+                LOG.log(Level.FINE, "Container details: resources={0} selected={1} accepted={2} changed={3} renamed={4} contentChanged={5} failed={6} duplicated={7}",
+                        new Object[]{cc.getAllResources(), cc.getAllSelected(), cc.getAllAccepted(),
+                        cc.getAllChanged(), cc.getAllRenamed(), cc.getAllContentChanged(),
+                        cc.getAllFailed(), cc.getAllDuplicated()});
+                for (Map.Entry<String, int[]> entry : cc.getChangedByAction().entrySet()) {
+                    LOG.log(Level.FINE, "  Action [{0}]: changed={1}", new Object[]{entry.getKey(), entry.getValue()[0]});
+                }
+            }
+            return changes.isChanged();
         }
+        LOG.warning("No changes information available from transformer");
         return false;
     }
 

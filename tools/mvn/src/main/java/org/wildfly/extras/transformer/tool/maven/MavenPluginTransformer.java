@@ -88,15 +88,17 @@ public class MavenPluginTransformer extends AbstractMojo {
             }
         }
 
-        if (inputFile != null && inputFile.isDirectory() && outputFolder != null) {
-            File outputDirectory = new File(outputFolder);
+        if (inputFile != null && inputFile.isDirectory()) {
+            if (outputFile == null && outputFolder == null) {
+                throw new MojoExecutionException("Either outputFile or outputFolder must be specified when inputFile is a directory");
+            }
+            File outputDirectory = outputFile != null ? outputFile : new File(outputFolder);
             if (!outputDirectory.exists()) {
                 outputDirectory.mkdirs();
             }
-            // transform files in output folder 
             if (outputDirectory.isDirectory()) {
                 try {
-                    getLog().info("Transforming contents of folder " + inputFile + " to " + outputFolder);
+                    getLog().info("Transforming contents of folder " + inputFile + " to " + outputDirectory.getAbsolutePath());
                     HandleTransformation.transformDirectory(inputFile, outputDirectory, configsDir, getLog().isDebugEnabled(), overwrite, invert);
                     return;
                 } catch (IOException e) {
@@ -107,7 +109,7 @@ public class MavenPluginTransformer extends AbstractMojo {
 
         inputFile = null;
 
-        if (mavenProject != null && mavenProject != null && mavenProject.getArtifact() != null && mavenProject.getArtifact().getFile() != null) {
+        if (mavenProject != null && mavenProject.getArtifact() != null && mavenProject.getArtifact().getFile() != null) {
             inputFile = mavenProject.getArtifact().getFile();
         } else if ((packaging.contains("jar") || packaging.contains("war") || packaging.contains("ear"))
                 && buildFolder != null && targetName != null) {
