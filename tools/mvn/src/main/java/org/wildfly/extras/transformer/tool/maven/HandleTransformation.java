@@ -21,9 +21,13 @@ import org.wildfly.extras.transformer.ArchiveTransformer;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.Collections;
+import java.util.Properties;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * HandleTransformation
@@ -33,7 +37,37 @@ import java.util.Set;
  */
 final class HandleTransformation {
 
-    public static final String JAR_FILE_EXT = ".jar";
+    private static final Logger LOG = Logger.getLogger(HandleTransformation.class.getName());
+
+    static final String COPY_ONLY_REFERENCE = "jakarta-copy-only.properties";
+
+    private static final Set<String> DEFAULT_COPY_ONLY_EXTENSIONS = loadExtensions(
+            HandleTransformation.class.getResourceAsStream("/" + COPY_ONLY_REFERENCE));
+
+    private static Set<String> loadExtensions(InputStream is) {
+        if (is == null) return Collections.emptySet();
+        Properties props = new Properties();
+        try (is) {
+            props.load(is);
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Failed to load " + COPY_ONLY_REFERENCE, e);
+        }
+        return props.stringPropertyNames();
+    }
+
+    private static Set<String> getCopyOnlyExtensions(String configsDir) {
+        if (configsDir != null) {
+            File override = new File(configsDir, COPY_ONLY_REFERENCE);
+            if (override.isFile()) {
+                try {
+                    return loadExtensions(Files.newInputStream(override.toPath()));
+                } catch (IOException e) {
+                    LOG.log(Level.WARNING, "Failed to load " + override.getAbsolutePath() + ", using defaults", e);
+                }
+            }
+        }
+        return DEFAULT_COPY_ONLY_EXTENSIONS;
+    }
 
     /**
      * Transform the files contained under the folder path specified.
@@ -53,8 +87,11 @@ final class HandleTransformation {
                                    Set<String> ignored) throws IOException {
         final File[] files = folder.listFiles();
         if (files == null) {
+            LOG.log(Level.WARNING, "No files found in directory: {0}", folder.getAbsolutePath());
             return;
         }
+        LOG.log(Level.FINE, "Transforming directory contents: {0} -> {1} ({2} entries)",
+                new Object[]{folder.getAbsolutePath(), targetFolder.getAbsolutePath(), files.length});
         for (File sourceFile : files) {
             File targetFile = new File(targetFolder, sourceFile.getName());
 
@@ -63,8 +100,11 @@ final class HandleTransformation {
             } else {
                 if (targetFile.exists()) {
                     if (overwrite) {
+                        LOG.log(Level.FINE, "Overwriting existing file: {0}", targetFile.getAbsolutePath());
                         targetFile.delete();
                         transformFile(sourceFile, new File(targetFolder, sourceFile.getName()), configsDir, verbose, invert, ignored);
+                    } else {
+                        LOG.log(Level.FINE, "Skipping existing file (overwrite=false): {0}", targetFile.getAbsolutePath());
                     }
                 } else {
                     transformFile(sourceFile, new File(targetFolder, sourceFile.getName()), configsDir, verbose, invert, ignored);
@@ -85,8 +125,18 @@ final class HandleTransformation {
         final String path = sourceFile.getPath();
         for (String ignore : ignored) {
             if (path.endsWith(ignore)) {
+                LOG.log(Level.FINE, "Ignoring file: {0}", path);
                 return;
             }
+        }
+        // Copy file types listed in jakarta-copy-only.properties directly without attempting transformation
+        final String name = sourceFile.getName();
+        final int dot = name.lastIndexOf('.');
+        if (dot >= 0 && getCopyOnlyExtensions(configsDir).contains(name.substring(dot))) {
+            Files.createDirectories(targetFile.toPath().getParent());
+            LOG.log(Level.FINE, "Copying as-is (excluded extension): {0}", path);
+            Files.copy(sourceFile.toPath(), targetFile.toPath());
+            return;
         }
         TransformerBuilder builder = TransformerFactory.getInstance().newTransformer();
         if (configsDir != null) {
@@ -95,11 +145,20 @@ final class HandleTransformation {
         builder.setVerbose(verbose);
         builder.setInvert(invert);
         ArchiveTransformer transformer = builder.build();
-        if (transformer.canTransformIndividualClassFile() || sourceFile.getName().endsWith(JAR_FILE_EXT)) {
+        if (!sourceFile.isDirectory()) {
             Files.createDirectories(targetFile.toPath().getParent());
+        }
+        LOG.log(Level.FINE, "Transforming: {0} -> {1}",
+                new Object[]{sourceFile.getAbsolutePath(), targetFile.getAbsolutePath()});
+        try {
             transformer.transform(sourceFile, targetFile);
-        } else {
-            throw new IllegalArgumentException("Supported file extensions are " + JAR_FILE_EXT + " : " + sourceFile.getAbsolutePath());
+        } catch (RuntimeException e) {
+            if (verbose) {
+                LOG.log(Level.WARNING, "Transformation not supported for " + sourceFile.getAbsolutePath() + ", copying as-is", e);
+            } else {
+                LOG.log(Level.INFO, "Transformation not supported for {0}, copying as-is", sourceFile.getAbsolutePath());
+            }
+            Files.copy(sourceFile.toPath(), targetFile.toPath());
         }
     }
 

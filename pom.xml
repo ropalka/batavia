@@ -24,7 +24,7 @@
     <parent>
         <groupId>org.jboss</groupId>
         <artifactId>jboss-parent</artifactId>
-        <version>36</version>
+        <version>51</version>
     </parent>
 
     <name>Javax to Jakarta Transformation Project</name>
@@ -53,9 +53,11 @@
     </issueManagement>
 
     <properties>
+        <maven.compiler.release>17</maven.compiler.release>
         <version.junit>4.13.1</version.junit>
         <version.org.ow2.asm>7.3.1</version.org.ow2.asm>
-        <version.org.eclipse.transformer>0.2.0</version.org.eclipse.transformer>
+        <version.slf4j>1.7.36</version.slf4j>
+        <version.org.eclipse.transformer>1.0.0</version.org.eclipse.transformer>
         <version.maven.core>3.8.1</version.maven.core>
         <version.maven.plugin.annotations>3.6.0</version.maven.plugin.annotations>
         <version.maven.plugin.api>2.0</version.maven.plugin.api>
@@ -90,9 +92,19 @@
                 <version>${version.org.eclipse.transformer}</version>
             </dependency>
             <dependency>
+                <groupId>org.eclipse.transformer</groupId>
+                <artifactId>org.eclipse.transformer.jakarta</artifactId>
+                <version>${version.org.eclipse.transformer}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm</artifactId>
                 <version>${version.org.ow2.asm}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>${version.slf4j}</version>
             </dependency>
             <dependency>
                 <groupId>org.wildfly.extras.batavia</groupId>
