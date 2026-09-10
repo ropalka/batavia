@@ -119,17 +119,20 @@ public class MavenPluginTransformer extends AbstractMojo {
         }
         if (inputFile != null && inputFile.exists()) {
             File outputDir = new File(inputFile.getParentFile(), inputFile.getName() + ".temp");
-            File outputFile = new File(outputDir, inputFile.getName());
-            getLog().info("transforming " + inputFile.getAbsolutePath() + " into " + outputFile.getAbsolutePath());
+            File tempOutput = new File(outputDir, inputFile.getName());
+            getLog().info("transforming " + inputFile.getAbsolutePath() + " into " + tempOutput.getAbsolutePath());
             try {
-                HandleTransformation.transformFile(inputFile, outputFile, configsDir, getLog().isDebugEnabled(), invert);
+                HandleTransformation.transformFile(inputFile, tempOutput, configsDir, getLog().isDebugEnabled(), invert);
                 if (outputDir.exists()) {
-                    getLog().info("transformer generated output file " + outputFile.getAbsolutePath() + " "
-                            + " outputFile size = " + outputFile.length());
-                    getLog().info("deleting " + inputFile.getName());
-                    inputFile.delete();
-                    getLog().info("rename " + outputFile.getAbsolutePath() + " to " + inputFile.getAbsolutePath());
-                    outputFile.renameTo(inputFile);
+                    getLog().info("transformer generated output file " + tempOutput.getAbsolutePath() + " "
+                            + " outputFile size = " + tempOutput.length());
+                    File finalOutput = outputFile != null ? outputFile : inputFile;
+                    if (outputFile == null) {
+                        getLog().info("deleting " + inputFile.getName());
+                        inputFile.delete();
+                    }
+                    getLog().info("rename " + tempOutput.getAbsolutePath() + " to " + finalOutput.getAbsolutePath());
+                    tempOutput.renameTo(finalOutput);
                 } else {
                     getLog().info("transformer didn't generate " + outputDir.getAbsolutePath());
                 }
