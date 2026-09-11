@@ -35,7 +35,7 @@
     <description>JavaEE to JakartaEE API Transformator</description>
     <url>https://github.com/wildfly-extras/batavia</url>
 
-    <version>1.0.16.Final-SNAPSHOT</version>
+    <version>1.0.16.Final</version>
 
     <licenses>
         <license>
