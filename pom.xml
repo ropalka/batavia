@@ -27,11 +27,15 @@
         <version>51</version>
     </parent>
 
-    <name>Javax to Jakarta Transformation Project</name>
     <groupId>org.wildfly.extras.batavia</groupId>
     <artifactId>transformer-parent</artifactId>
-    <version>1.0.16.Final-SNAPSHOT</version>
     <packaging>pom</packaging>
+
+    <name>Javax to Jakarta Transformation Project</name>
+    <description>JavaEE to JakartaEE API Transformator</description>
+    <url>https://github.com/wildfly-extras/batavia</url>
+
+    <version>1.0.16.Final-SNAPSHOT</version>
 
     <licenses>
         <license>
@@ -45,6 +49,7 @@
         <connection>scm:git:git@github.com:wildfly-extras/batavia.git</connection>
         <developerConnection>scm:git:git@github.com:wildfly-extras/batavia.git</developerConnection>
         <url>https://github.com/wildfly-extras/batavia</url>
+        <tag>${nexus.staging.tag}</tag>
     </scm>
 
     <issueManagement>
@@ -53,6 +58,11 @@
     </issueManagement>
 
     <properties>
+        <!-- Repository Deployment Settings -->
+        <nexus.repository.staging>jboss-io</nexus.repository.staging>
+        <nexus.repository.release>releases</nexus.repository.release>
+        <nexus.staging.tag>batavia-${project.version}</nexus.staging.tag>
+        <!-- Dependency versions -->
         <maven.compiler.release>17</maven.compiler.release>
         <version.junit>4.13.1</version.junit>
         <version.org.ow2.asm>7.3.1</version.org.ow2.asm>
